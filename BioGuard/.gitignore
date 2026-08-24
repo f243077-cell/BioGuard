@@ -1,0 +1,55 @@
+# ==== Environment & Secrets ====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+credentials.json
+
+# ==== Python ====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ==== Database ====
+*.db
+*.sqlite3
+*.sql
+db_data/
+postgres_data/
+
+# ==== Docker ====
+docker-compose.override.yml
+*.override.yml
+
+# ==== Mosquitto ====
+broker/passwd
+broker/*.log
+broker/data/
+
+# ==== Logs ====
+*.log
+logs/
+
+# ==== IDE / OS ====
+.vscode/
+.idea/
+.DS_Store
+
+# Ensure this matches the exact folder structure
+BioGuard/backend/firebase-credentials.json
+
+firebase-credentials.json

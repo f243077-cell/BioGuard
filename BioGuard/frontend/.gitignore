@@ -1,0 +1,55 @@
+# ==== Sensitive: Firebase / API Keys / Signing ====
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+macos/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+android/key.properties
+android/**/*.keystore
+android/**/*.jks
+*.env
+.env
+.env.*
+!.env.example
+
+# ==== Flutter/Dart standard ====
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+*.ipr
+*.iws
+
+# ==== Android ====
+android/.gradle/
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/**/GeneratedPluginRegistrant.java
+
+# ==== iOS / macOS ====
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/ServiceDefinitions.json
+macos/Flutter/GeneratedPluginRegistrant.swift
+**/Pods/
+
+# ==== IDE / OS ====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ==== Coverage / Symbols ====
+coverage/
+app.*.symbols
+app.*.map.json
