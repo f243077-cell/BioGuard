@@ -1,23 +1,25 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/alert.dart';
+import '../providers/auth_provider.dart';
 import '../services/websocket_service.dart';
 import '../utils/alarm_player.dart';
 import '../widgets/alert_banner.dart';
 
 /// BioGuard — Alerts Screen
 /// Live-updating list of alerts received over the WebSocket connection.
-class AlertsScreen extends StatefulWidget {
+class AlertsScreen extends ConsumerStatefulWidget {
   const AlertsScreen({super.key});
 
   @override
-  State<AlertsScreen> createState() => _AlertsScreenState();
+  ConsumerState<AlertsScreen> createState() => _AlertsScreenState();
 }
 
-class _AlertsScreenState extends State<AlertsScreen> {
-  final WebSocketService _wsService = WebSocketService();
+class _AlertsScreenState extends ConsumerState<AlertsScreen> {
+  WebSocketService? _wsService;
   final AlarmPlayer _alarmPlayer = AlarmPlayer();
   final List<Alert> _alerts = [];
   Alert? _bannerAlert;
@@ -25,8 +27,11 @@ class _AlertsScreenState extends State<AlertsScreen> {
   @override
   void initState() {
     super.initState();
-    _wsService.connect();
-    _wsService.alerts.listen((alert) {
+    _wsService = WebSocketService(
+      tokenStorage: ref.read(tokenStorageProvider),
+    );
+    _wsService!.connect();
+    _wsService!.alerts.listen((alert) {
       if (!mounted) return;
       setState(() {
         _alerts.insert(0, alert);
@@ -40,7 +45,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
   @override
   void dispose() {
-    _wsService.dispose();
+    _wsService?.dispose();
     _alarmPlayer.dispose();
     super.dispose();
   }

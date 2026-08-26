@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/device.dart';
 import '../models/reading.dart';
+import 'token_storage.dart';
 
 /// BioGuard — API Service
 /// REST calls to the backend's device endpoints.
@@ -15,8 +16,21 @@ import '../models/reading.dart';
 class ApiService {
   static const String apiBaseUrl = 'http://10.0.2.2:8000';
 
+  ApiService({required TokenStorage tokenStorage}) : _tokenStorage = tokenStorage;
+
+  final TokenStorage _tokenStorage;
+
+  Future<Map<String, String>> _authHeaders() async {
+    final token = await _tokenStorage.getToken();
+    if (token == null) return {};
+    return {'Authorization': 'Bearer $token'};
+  }
+
   Future<List<Device>> fetchDevices() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/devices'));
+    final response = await http.get(
+      Uri.parse('$apiBaseUrl/devices'),
+      headers: await _authHeaders(),
+    );
 
     if (response.statusCode != 200) {
       throw Exception('Failed to load devices (${response.statusCode})');
@@ -37,7 +51,7 @@ class ApiService {
     };
     final uri = Uri.parse('$apiBaseUrl/devices/$deviceId/history')
         .replace(queryParameters: query);
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: await _authHeaders());
 
     if (response.statusCode != 200) {
       throw Exception('Failed to load history (${response.statusCode})');

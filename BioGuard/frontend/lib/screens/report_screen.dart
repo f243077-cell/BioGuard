@@ -1,39 +1,58 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/device.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
 /// BioGuard — Report Screen
 /// Lists devices and opens a PDF summary report for the selected one.
-class ReportScreen extends StatefulWidget {
-  const ReportScreen({super.key});
+class ReportScreen extends ConsumerStatefulWidget {
+  const ReportScreen({super.key, this.isActive = false});
+
+  final bool isActive;
 
   @override
-  State<ReportScreen> createState() => _ReportScreenState();
+  ConsumerState<ReportScreen> createState() => _ReportScreenState();
 }
 
-class _ReportScreenState extends State<ReportScreen> {
-  final ApiService _apiService = ApiService();
+class _ReportScreenState extends ConsumerState<ReportScreen> {
   List<Device> _devices = [];
-  bool _loading = true;
+  bool _loading = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadDevices();
+    if (widget.isActive) {
+      _loadDevices();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ReportScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _loadDevices();
+    }
   }
 
   Future<void> _loadDevices() async {
+    setState(() {
+      _loading = _devices.isEmpty;
+      _error = null;
+    });
+
     try {
-      final devices = await _apiService.fetchDevices();
+      final devices = await ref.read(apiServiceProvider).fetchDevices();
       if (!mounted) return;
       setState(() {
         _devices = devices;
         _loading = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -45,7 +64,10 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _openReport(String deviceId) async {
-    final uri = Uri.parse('${ApiService.apiBaseUrl}/reports/pdf/$deviceId');
+    final token = await ref.read(tokenStorageProvider).getToken();
+    final uri = Uri.parse(
+      '${ApiService.apiBaseUrl}/reports/pdf/$deviceId',
+    ).replace(queryParameters: token != null ? {'token': token} : null);
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -78,38 +100,70 @@ class _ReportScreenState extends State<ReportScreen> {
     }
     if (_error != null) {
       return Center(
-        child: Text(
-          'Failed to load devices:\n$_error',
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Failed to load devices:\n$_error',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadDevices,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.2),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
       );
     }
     if (_devices.isEmpty) {
-      return const Center(
-        child: Text(
-          'No devices reporting yet.',
-          style: TextStyle(color: Colors.white70),
+      return RefreshIndicator(
+        onRefresh: _loadDevices,
+        color: Colors.cyanAccent,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 120),
+            Center(
+              child: Text(
+                'No devices reporting yet.',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(bottom: 16),
-          child: Text(
-            'Reports',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
+    return RefreshIndicator(
+      onRefresh: _loadDevices,
+      color: Colors.cyanAccent,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16),
+            child: Text(
+              'Reports',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-        ),
-        ..._devices.map(_buildDeviceTile),
-      ],
+          ..._devices.map(_buildDeviceTile),
+        ],
+      ),
     );
   }
 

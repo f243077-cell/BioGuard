@@ -7,7 +7,8 @@ plugins {
 
 android {
     namespace = "com.example.bioguard"
-    compileSdk = flutter.compileSdkVersion
+    compileSdkExtension = 0
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -6,7 +6,10 @@ Pushes new/resolved alerts to connected clients in real time.
 import asyncio
 from typing import List, Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_db, resolve_user_from_flexible_token
 
 router = APIRouter(tags=["websocket"])
 
@@ -51,7 +54,16 @@ def broadcast_alert_sync(alert_dict: dict) -> None:
 
 
 @router.websocket("/ws/alerts")
-async def alerts_websocket(websocket: WebSocket):
+async def alerts_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
+    try:
+        resolve_user_from_flexible_token(
+            websocket.query_params.get("token"),
+            websocket.headers.get("authorization"),
+            db,
+        )
+    except HTTPException:
+        return
+
     await manager.connect(websocket)
     try:
         while True:

@@ -1,8 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'providers/auth_provider.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/login_screen.dart';
 import 'screens/report_screen.dart';
 import 'services/fcm_service.dart';
 
@@ -10,18 +13,32 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   await FcmService().initialize();
-  runApp(const BioGuardApp());
+  runApp(const ProviderScope(child: BioGuardApp()));
 }
 
-class BioGuardApp extends StatelessWidget {
+class BioGuardApp extends ConsumerWidget {
   const BioGuardApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+
+    Widget home;
+    switch (authState.status) {
+      case AuthStatus.unknown:
+        home = const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+      case AuthStatus.unauthenticated:
+        home = const LoginScreen();
+      case AuthStatus.authenticated:
+        home = const MainShell();
+    }
+
     return MaterialApp(
       title: 'BioGuard',
       debugShowCheckedModeBanner: false,
-      home: const MainShell(),
+      home: home,
     );
   }
 }
@@ -37,12 +54,17 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _index = 0;
 
-  static const _screens = [DashboardScreen(), AlertsScreen(), ReportScreen()];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _index, children: _screens),
+      body: IndexedStack(
+        index: _index,
+        children: [
+          const DashboardScreen(),
+          const AlertsScreen(),
+          ReportScreen(isActive: _index == 2),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
         onTap: (i) => setState(() => _index = i),

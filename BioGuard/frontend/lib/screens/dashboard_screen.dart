@@ -2,22 +2,22 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/device.dart';
-import '../services/api_service.dart';
+import '../providers/auth_provider.dart';
 
 /// BioGuard — Dashboard Screen
 /// Polls the backend every few seconds and shows each device's live status
 /// as a glassmorphic card over a colorful gradient background.
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  final ApiService _apiService = ApiService();
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Timer? _pollTimer;
 
   List<Device> _devices = [];
@@ -41,7 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadDevices() async {
     try {
-      final devices = await _apiService.fetchDevices();
+      final devices = await ref.read(apiServiceProvider).fetchDevices();
       if (!mounted) return;
       setState(() {
         _devices = devices;
