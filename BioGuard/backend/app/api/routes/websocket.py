@@ -62,6 +62,8 @@ async def alerts_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
             db,
         )
     except HTTPException:
+        await websocket.accept()
+        await websocket.close(code=4401, reason="Invalid or missing token")
         return
 
     await manager.connect(websocket)

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/device.dart';
 import '../providers/auth_provider.dart';
+import '../services/api_exceptions.dart';
 
 /// BioGuard — Dashboard Screen
 /// Polls the backend every few seconds and shows each device's live status
@@ -48,6 +49,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         _loading = false;
         _error = null;
       });
+    } on UnauthorizedException {
+      // Token is dead — stop polling immediately so we don't keep hitting
+      // a 401 in a loop, then log out. Whatever watches authProvider's
+      // state (router / top-level shell) is responsible for the redirect.
+      _pollTimer?.cancel();
+      if (!mounted) return;
+      await ref.read(authProvider.notifier).logout();
     } catch (e) {
       if (!mounted) return;
       setState(() {

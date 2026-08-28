@@ -2,36 +2,54 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// add import
-import 'register_screen.dart';
+
 import '../providers/auth_provider.dart';
 
-/// BioGuard — Login Screen
-/// Authenticates the clinician and stores the JWT for subsequent API calls.
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+/// BioGuard — Register Screen
+/// Creates a new account, then hands off to AuthNotifier.register()
+/// which chains into login on success.
+class RegisterScreen extends ConsumerStatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
 
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
     await ref
         .read(authProvider.notifier)
-        .login(_usernameController.text.trim(), _passwordController.text);
+        .register(_usernameController.text.trim(), _passwordController.text);
+
+    if (!mounted) return;
+
+    if (ref.read(authProvider).status == AuthStatus.authenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account created successfully!')),
+      );
+      _usernameController.clear();
+      _passwordController.clear();
+      _confirmController.clear();
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+    // On failure, authState.error is already set by register() and
+    // renders via the existing error Text widget in build() — no extra
+    // handling needed here.
   }
 
   @override
@@ -73,7 +91,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const Text(
-                            'BioGuard',
+                            'Create account',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white,
@@ -83,7 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Sign in to monitor cold-chain storage',
+                            'Set up access to BioGuard',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.white70),
                           ),
@@ -95,7 +113,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             textInputAction: TextInputAction.next,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Enter your username';
+                                return 'Enter a username';
                               }
                               return null;
                             },
@@ -106,11 +124,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             obscureText: true,
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration('Password'),
+                            textInputAction: TextInputAction.next,
+                            validator: (value) {
+                              if (value == null || value.length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _confirmController,
+                            obscureText: true,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: _inputDecoration('Confirm password'),
                             textInputAction: TextInputAction.done,
                             onFieldSubmitted: (_) => _submit(),
                             validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Enter your password';
+                              if (value != _passwordController.text) {
+                                return 'Passwords do not match';
                               }
                               return null;
                             },
@@ -144,7 +176,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     ),
                                   )
                                 : const Text(
-                                    'Sign in',
+                                    'Create account',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -152,13 +184,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           const SizedBox(height: 12),
                           TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
-                              ),
-                            ),
+                            onPressed: () => Navigator.of(context).pop(),
                             child: const Text(
-                              "Don't have an account? Create one",
+                              'Already have an account? Sign in',
                               style: TextStyle(color: Colors.white70),
                             ),
                           ),

@@ -5,6 +5,9 @@ import 'package:http/http.dart' as http;
 import '../models/device.dart';
 import '../models/reading.dart';
 import 'token_storage.dart';
+import 'api_exceptions.dart';
+// add to imports
+import '../models/alert.dart';
 
 /// BioGuard — API Service
 /// REST calls to the backend's device endpoints.
@@ -16,7 +19,8 @@ import 'token_storage.dart';
 class ApiService {
   static const String apiBaseUrl = 'http://10.0.2.2:8000';
 
-  ApiService({required TokenStorage tokenStorage}) : _tokenStorage = tokenStorage;
+  ApiService({required TokenStorage tokenStorage})
+    : _tokenStorage = tokenStorage;
 
   final TokenStorage _tokenStorage;
 
@@ -32,12 +36,49 @@ class ApiService {
       headers: await _authHeaders(),
     );
 
+    if (response.statusCode == 401) {
+      throw UnauthorizedException();
+    }
     if (response.statusCode != 200) {
-      throw Exception('Failed to load devices (${response.statusCode})');
+      throw ApiException(
+        'Failed to load devices',
+        statusCode: response.statusCode,
+      );
     }
 
     final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
-    return data.map((json) => Device.fromJson(json as Map<String, dynamic>)).toList();
+    return data
+        .map((json) => Device.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<Alert>> fetchAlerts({
+    String? deviceId,
+    bool? resolved,
+    int limit = 100,
+  }) async {
+    final query = {
+      'limit': limit.toString(),
+      if (deviceId != null) 'device_id': deviceId,
+      if (resolved != null) 'resolved': resolved.toString(),
+    };
+    final uri = Uri.parse('$apiBaseUrl/alerts').replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+
+    if (response.statusCode == 401) {
+      throw UnauthorizedException();
+    }
+    if (response.statusCode != 200) {
+      throw ApiException(
+        'Failed to load alerts',
+        statusCode: response.statusCode,
+      );
+    }
+
+    final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
+    return data
+        .map((json) => Alert.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<Reading>> fetchDeviceHistory(
@@ -49,15 +90,24 @@ class ApiService {
       'limit': limit.toString(),
       if (readingType != null) 'reading_type': readingType,
     };
-    final uri = Uri.parse('$apiBaseUrl/devices/$deviceId/history')
-        .replace(queryParameters: query);
+    final uri = Uri.parse(
+      '$apiBaseUrl/devices/$deviceId/history',
+    ).replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
 
+    if (response.statusCode == 401) {
+      throw UnauthorizedException();
+    }
     if (response.statusCode != 200) {
-      throw Exception('Failed to load history (${response.statusCode})');
+      throw ApiException(
+        'Failed to load history',
+        statusCode: response.statusCode,
+      );
     }
 
     final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
-    return data.map((json) => Reading.fromJson(json as Map<String, dynamic>)).toList();
+    return data
+        .map((json) => Reading.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 }

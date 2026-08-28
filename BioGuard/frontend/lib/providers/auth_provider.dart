@@ -9,11 +9,7 @@ import '../services/token_storage.dart';
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
 class AuthState {
-  const AuthState({
-    required this.status,
-    this.isLoading = false,
-    this.error,
-  });
+  const AuthState({required this.status, this.isLoading = false, this.error});
 
   final AuthStatus status;
   final bool isLoading;
@@ -35,7 +31,7 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._tokenStorage)
-      : super(const AuthState(status: AuthStatus.unknown)) {
+    : super(const AuthState(status: AuthStatus.unknown)) {
     _restoreSession();
   }
 
@@ -44,8 +40,42 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _restoreSession() async {
     final token = await _tokenStorage.getToken();
     state = AuthState(
-      status: token != null ? AuthStatus.authenticated : AuthStatus.unauthenticated,
+      status: token != null
+          ? AuthStatus.authenticated
+          : AuthStatus.unauthenticated,
     );
+  }
+
+  Future<void> register(String username, String password) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiService.apiBaseUrl}/auth/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'username': username, 'password': password}),
+      );
+
+      if (response.statusCode != 201) {
+        final detail = _extractErrorDetail(response.body);
+        state = state.copyWith(
+          status: AuthStatus.unauthenticated,
+          isLoading: false,
+          error: detail ?? 'Could not create account',
+        );
+        return;
+      }
+
+      // /auth/register returns UserOut, not a token — chain straight into
+      // login so the user isn't asked to re-enter credentials immediately.
+      await login(username, password);
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        isLoading: false,
+        error: 'Could not reach the server. Check your connection.',
+      );
+    }
   }
 
   Future<void> login(String username, String password) async {

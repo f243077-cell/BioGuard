@@ -8,6 +8,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/report_screen.dart';
 import 'services/fcm_service.dart';
+import 'widgets/authenticated_app_bar.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,9 +27,7 @@ class BioGuardApp extends ConsumerWidget {
     Widget home;
     switch (authState.status) {
       case AuthStatus.unknown:
-        home = const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        );
+        home = const Scaffold(body: Center(child: CircularProgressIndicator()));
       case AuthStatus.unauthenticated:
         home = const LoginScreen();
       case AuthStatus.authenticated:
@@ -44,6 +43,7 @@ class BioGuardApp extends ConsumerWidget {
 }
 
 /// Bottom-nav shell switching between the live Dashboard and Alerts screens.
+/// Bottom-nav shell switching between the live Dashboard and Alerts screens.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -53,10 +53,12 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
+  static const _titles = ['Dashboard', 'Alerts', 'Reports'];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AuthenticatedAppBar(title: _titles[_index]),
       body: IndexedStack(
         index: _index,
         children: [

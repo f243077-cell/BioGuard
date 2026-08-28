@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.routes.alerts import router as alerts_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.devices import router as devices_router
 from app.api.routes.reports import router as reports_router
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="BioGuard Backend", lifespan=lifespan)
+app.include_router(alerts_router)
 app.include_router(auth_router)
 app.include_router(devices_router)
 app.include_router(websocket_router)

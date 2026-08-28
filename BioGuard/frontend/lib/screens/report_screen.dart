@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/device.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+// add import
+import '../services/api_exceptions.dart';
 
 /// BioGuard — Report Screen
 /// Lists devices and opens a PDF summary report for the selected one.
@@ -54,6 +56,9 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
         _loading = false;
         _error = null;
       });
+    } on UnauthorizedException {
+      if (!mounted) return;
+      await ref.read(authProvider.notifier).logout();
     } catch (e) {
       if (!mounted) return;
       setState(() {
