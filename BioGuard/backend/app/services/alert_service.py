@@ -1,3 +1,4 @@
+
 """
 BioGuard Backend — Alert Service
 Creates and resolves Alert rows based on threshold evaluation of incoming readings.
@@ -17,7 +18,6 @@ from app.services.threshold import (
     temperature_severity,
 )
 
-
 def evaluate_and_record(
     db: Session,
     *,
@@ -25,14 +25,13 @@ def evaluate_and_record(
     reading_id: int,
     reading_type: str,
     value,
+    threshold_min: float = None,
+    threshold_max: float = None,
 ) -> List[Alert]:
     """
-    Check a reading against all applicable conditions for its type. Each
-    condition is tracked independently (its own create/resolve lifecycle),
-    since a single reading can trigger or resolve more than one alert type
-    at once — e.g. a temperature reading can resolve a rapid-change alert
-    while simultaneously triggering an out-of-range one.
-    Returns every Alert that changed state (created or resolved) this call.
+    ...(same docstring)...
+    threshold_min/threshold_max are the device's configured safe range —
+    required for temperature readings, unused for lock readings.
     """
     changed: List[Alert] = []
 
@@ -43,8 +42,8 @@ def evaluate_and_record(
                 device_id=device_id,
                 reading_id=reading_id,
                 alert_type="temperature_out_of_range",
-                breached=temperature_breached(value),
-                severity=temperature_severity(value),
+                breached=temperature_breached(value, threshold_min, threshold_max),
+                severity=temperature_severity(value, threshold_min, threshold_max),
                 message=f"Temperature {value}°C is outside the safe range",
             )
         )
@@ -73,7 +72,6 @@ def evaluate_and_record(
         )
 
     return [alert for alert in changed if alert is not None]
-
 
 def _check_and_apply(
     db: Session,

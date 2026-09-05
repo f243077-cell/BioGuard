@@ -21,3 +21,4 @@ class AlertOut(BaseModel):
     resolved: bool
     created_at: datetime
     resolved_at: Optional[datetime] = None
+    notes: Optional[str] = None

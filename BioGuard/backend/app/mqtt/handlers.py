@@ -9,6 +9,7 @@ from app.api.routes.websocket import broadcast_alert_sync
 from app.db.session import SessionLocal
 from app.models.reading import Reading
 from app.services.alert_service import evaluate_and_record
+from app.services.device_service import get_or_create_device
 
 
 def handle_temperature_message(topic: str, payload: bytes) -> None:
@@ -43,6 +44,8 @@ def _store_reading(topic: str, payload: bytes, reading_type: str) -> None:
 
     db = SessionLocal()
     try:
+        device = get_or_create_device(db, device_id)
+
         db.add(reading)
         db.commit()
         db.refresh(reading)
@@ -54,6 +57,8 @@ def _store_reading(topic: str, payload: bytes, reading_type: str) -> None:
             reading_id=reading.id,
             reading_type=reading_type,
             value=value,
+            threshold_min=device.threshold_min,
+            threshold_max=device.threshold_max,
         )
         for alert in alerts:
             broadcast_alert_sync(
