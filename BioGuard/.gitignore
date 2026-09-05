@@ -49,6 +49,12 @@ logs/
 .idea/
 .DS_Store
 
+# ==== Ad-hoc debug scripts (not part of the app) ====
+backend/check_db.py
+backend/check_alerts.py
+backend/update_threshold.py
+backend/reset_threshold.py
+
 # Ensure this matches the exact folder structure
 BioGuard/backend/firebase-credentials.json
 

@@ -1,8 +1,16 @@
 
 """
 BioGuard Backend — Alert Service
-Creates and resolves Alert rows based on threshold evaluation of incoming readings.
-"""
+    Check a reading against all applicable conditions for its type. Each
+    condition is tracked independently (its own create/resolve lifecycle),
+    since a single reading can trigger or resolve more than one alert type
+    at once — e.g. a temperature reading can resolve a rapid-change alert
+    while simultaneously triggering an out-of-range one.
+    Returns every Alert that changed state (created or resolved) this call.
+
+    threshold_min/threshold_max are the device's configured safe range —
+    required for temperature readings, unused for lock readings.
+    """
 
 from datetime import datetime, timezone
 from typing import List, Optional

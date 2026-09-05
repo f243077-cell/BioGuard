@@ -14,13 +14,15 @@ engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-
 def init_db() -> None:
-    """Create all tables that don't exist yet."""
-    from app.models import alert, reading, user  # noqa: F401  (register models with Base.metadata)
+    """Create all tables that don't exist yet.
 
-    Base.metadata.create_all(bind=engine)
-
+    NOTE: schema creation is now owned by Alembic migrations. This function
+    intentionally does nothing — kept as a no-op so main.py's lifespan
+    doesn't need restructuring. Run `alembic upgrade head` to apply schema
+    changes instead of relying on this.
+    """
+    pass
 
 def get_db():
     """FastAPI dependency that yields a DB session and closes it after the request."""
