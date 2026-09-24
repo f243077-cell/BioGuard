@@ -3,10 +3,11 @@ BioGuard Backend — Alert Schemas
 Pydantic models for API responses built from the Alert ORM model.
 """
 
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
+
+from app.schemas.types import UTCDateTime
 
 
 class AlertOut(BaseModel):
@@ -19,6 +20,6 @@ class AlertOut(BaseModel):
     message: str
     severity: str
     resolved: bool
-    created_at: datetime
-    resolved_at: Optional[datetime] = None
+    created_at: UTCDateTime
+    resolved_at: Optional[UTCDateTime] = None
     notes: Optional[str] = None

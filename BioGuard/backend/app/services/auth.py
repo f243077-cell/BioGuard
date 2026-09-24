@@ -17,7 +17,12 @@ def hash_password(plain_password: str) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except ValueError:
+        # Over bcrypt's 72-byte limit or a malformed stored hash — a failed
+        # login, not a server error.
+        return False
 
 
 def create_access_token(username: str) -> str:

@@ -21,7 +21,7 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 def list_alerts(
     device_id: Optional[str] = Query(default=None),
     resolved: Optional[bool] = Query(default=None),
-    limit: int = Query(default=100, le=1000),
+    limit: int = Query(default=100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

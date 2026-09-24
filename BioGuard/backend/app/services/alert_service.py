@@ -1,16 +1,8 @@
-
 """
 BioGuard Backend — Alert Service
-    Check a reading against all applicable conditions for its type. Each
-    condition is tracked independently (its own create/resolve lifecycle),
-    since a single reading can trigger or resolve more than one alert type
-    at once — e.g. a temperature reading can resolve a rapid-change alert
-    while simultaneously triggering an out-of-range one.
-    Returns every Alert that changed state (created or resolved) this call.
-
-    threshold_min/threshold_max are the device's configured safe range —
-    required for temperature readings, unused for lock readings.
-    """
+Checks each reading against every applicable condition for its type and
+opens, escalates or resolves the matching alert.
+"""
 
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -26,6 +18,9 @@ from app.services.threshold import (
     temperature_severity,
 )
 
+_SEVERITY_RANK = {"warning": 1, "critical": 2}
+
+
 def evaluate_and_record(
     db: Session,
     *,
@@ -33,13 +28,21 @@ def evaluate_and_record(
     reading_id: int,
     reading_type: str,
     value,
+    previous_value: Optional[float] = None,
     threshold_min: float = None,
     threshold_max: float = None,
 ) -> List[Alert]:
     """
-    ...(same docstring)...
-    threshold_min/threshold_max are the device's configured safe range —
-    required for temperature readings, unused for lock readings.
+    Check a reading against all applicable conditions for its type. Each
+    condition is tracked independently (its own create/resolve lifecycle),
+    since a single reading can trigger or resolve more than one alert type
+    at once — e.g. a temperature reading can resolve a rapid-change alert
+    while simultaneously triggering an out-of-range one.
+    Returns every Alert that changed state (created, escalated or resolved).
+
+    threshold_min/threshold_max are the device's configured safe range and
+    previous_value is the device's prior temperature — both required for
+    temperature readings, unused for lock readings.
     """
     changed: List[Alert] = []
 
@@ -61,7 +64,7 @@ def evaluate_and_record(
                 device_id=device_id,
                 reading_id=reading_id,
                 alert_type="temperature_rapid_change",
-                breached=temperature_rate_of_change_breached(device_id, value),
+                breached=temperature_rate_of_change_breached(previous_value, value),
                 severity="warning",
                 message=f"Temperature changed rapidly to {value}°C",
             )
@@ -81,6 +84,7 @@ def evaluate_and_record(
 
     return [alert for alert in changed if alert is not None]
 
+
 def _check_and_apply(
     db: Session,
     *,
@@ -91,8 +95,9 @@ def _check_and_apply(
     severity: str,
     message: str,
 ) -> Optional[Alert]:
-    """Create a new alert if breached and none is open, or resolve the open
-    one if back to normal. Returns the Alert that changed, or None."""
+    """Create a new alert if breached and none is open, escalate the open one
+    if the condition got worse, or resolve it once back to normal. Returns
+    the Alert that changed, or None."""
     open_alert = (
         db.query(Alert)
         .filter(Alert.device_id == device_id, Alert.alert_type == alert_type, Alert.resolved.is_(False))
@@ -112,6 +117,18 @@ def _check_and_apply(
         db.refresh(alert)
         send_alert_push(device_id=device_id, message=message, severity=severity)
         return alert
+
+    if breached and _SEVERITY_RANK.get(severity, 0) > _SEVERITY_RANK.get(open_alert.severity, 0):
+        # A gradual drift opens the alert as a warning just past the limit;
+        # without escalation it would stay a warning (and never sound the
+        # app's critical alarm) however far the temperature went.
+        open_alert.severity = severity
+        open_alert.message = message
+        open_alert.reading_id = reading_id
+        db.commit()
+        db.refresh(open_alert)
+        send_alert_push(device_id=device_id, message=message, severity=severity)
+        return open_alert
 
     if not breached and open_alert is not None:
         open_alert.resolved = True

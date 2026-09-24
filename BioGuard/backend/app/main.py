@@ -14,6 +14,7 @@ from app.api.routes.devices import router as devices_router
 from app.api.routes.reports import router as reports_router
 from app.api.routes.websocket import router as websocket_router
 from app.api.routes.websocket import set_event_loop
+from app.config import DEV_JWT_SECRET_KEY, JWT_SECRET_KEY
 from app.db.session import init_db
 from app.mqtt.client import start_mqtt_client, stop_mqtt_client
 
@@ -21,6 +22,8 @@ from app.mqtt.client import start_mqtt_client, stop_mqtt_client
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    if JWT_SECRET_KEY == DEV_JWT_SECRET_KEY:
+        print("[BioGuard Backend] WARNING: using the development JWT secret — set JWT_SECRET_KEY before deploying.")
     set_event_loop(asyncio.get_running_loop())
     start_mqtt_client()
     print("[BioGuard Backend] Startup complete — DB ready, MQTT subscriber running.")

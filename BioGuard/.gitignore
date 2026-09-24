@@ -26,6 +26,8 @@ ENV/
 
 # ==== Database ====
 *.db
+*.db-wal
+*.db-shm
 *.sqlite3
 *.sql
 db_data/

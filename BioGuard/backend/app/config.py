@@ -4,9 +4,16 @@ Central settings: database URL, MQTT broker connection, and alert thresholds.
 """
 
 import os
+from pathlib import Path
+
+# backend/ — used to anchor default paths so they don't depend on the
+# directory uvicorn/alembic happens to be launched from.
+BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 # Database
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./bioguard.db")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", f"sqlite:///{(BACKEND_DIR / 'bioguard.db').as_posix()}"
+)
 
 # MQTT broker connection (same broker the simulator publishes to)
 MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", "localhost")
@@ -21,12 +28,14 @@ MQTT_TOPIC_LOCK = "bioguard/+/lock"
 TEMP_ALERT_MIN_C = 2.0
 TEMP_ALERT_MAX_C = 8.0
 
-# Firebase Cloud Messaging (used from Phase 4 onward)
-FCM_SERVER_KEY = os.getenv("FCM_SERVER_KEY", "")
+# Firebase Cloud Messaging (used from Phase 4 onward) — path to the
+# service-account JSON. Push notifications are skipped when unset.
+FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
 
 # Auth / JWT (used from Phase 6 onward)
 # IMPORTANT: the default below is for local dev only — set a real
 # JWT_SECRET_KEY env var before deploying anywhere it matters.
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-change-me-before-deploying-anywhere-real")
+DEV_JWT_SECRET_KEY = "dev-secret-change-me-before-deploying-anywhere-real"
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", DEV_JWT_SECRET_KEY)
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", 60 * 24))  # 24 hours

@@ -3,13 +3,13 @@ BioGuard Backend — Threshold Evaluation
 Pure functions that decide whether a reading breaches an alert-worthy condition.
 """
 
-from typing import Dict
+from typing import Optional
 
 # Max allowed change between two consecutive readings for the same device
 # before it's flagged as a rapid change, even if still inside the safe range.
 TEMP_RATE_OF_CHANGE_LIMIT_C = 3.0
 
-_last_temp_by_device: Dict[str, float] = {}
+LOCK_STATES = ("locked", "unlocked")
 
 
 def temperature_breached(temp_c: float, threshold_min: float, threshold_max: float) -> bool:
@@ -30,14 +30,13 @@ def temperature_severity(temp_c: float, threshold_min: float, threshold_max: flo
     return "warning"
 
 
-def temperature_rate_of_change_breached(device_id: str, temp_c: float) -> bool:
+def temperature_rate_of_change_breached(previous_c: Optional[float], temp_c: float) -> bool:
     """
-    True if this device's temperature moved more than the allowed limit
-    since its last reading. Unaffected by per-device thresholds — this is
-    about rate of change, not absolute range.
+    True if temperature moved more than the allowed limit since the
+    device's previous reading. Unaffected by per-device thresholds — this
+    is about rate of change, not absolute range. The previous value comes
+    from the database, so the check survives backend restarts.
     """
-    previous = _last_temp_by_device.get(device_id)
-    _last_temp_by_device[device_id] = temp_c
-    if previous is None:
+    if previous_c is None:
         return False
-    return abs(temp_c - previous) > TEMP_RATE_OF_CHANGE_LIMIT_C
+    return abs(temp_c - previous_c) > TEMP_RATE_OF_CHANGE_LIMIT_C

@@ -3,10 +3,11 @@ BioGuard Backend — Reading Schemas
 Pydantic models for API responses built from the Reading ORM model.
 """
 
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
+
+from app.schemas.types import UTCDateTime
 
 
 class ReadingOut(BaseModel):
@@ -18,7 +19,7 @@ class ReadingOut(BaseModel):
     numeric_value: Optional[float] = None
     status_value: Optional[str] = None
     anomalous: bool
-    timestamp: datetime
+    timestamp: UTCDateTime
 
 
 class DeviceStatus(BaseModel):

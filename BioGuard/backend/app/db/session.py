@@ -3,26 +3,42 @@ BioGuard Backend — Database Session
 Creates the SQLAlchemy engine and provides a session dependency for FastAPI routes.
 """
 
-from sqlalchemy import create_engine
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from app.config import DATABASE_URL
-from app.db.base import Base
+from app.config import BACKEND_DIR, DATABASE_URL
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
+
+if engine.dialect.name == "sqlite":
+
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_wal(dbapi_connection, _record):
+        # WAL lets API reads run while the MQTT thread is writing, instead of
+        # failing with "database is locked" under concurrent load.
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.close()
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-def init_db() -> None:
-    """Create all tables that don't exist yet.
 
-    NOTE: schema creation is now owned by Alembic migrations. This function
-    intentionally does nothing — kept as a no-op so main.py's lifespan
-    doesn't need restructuring. Run `alembic upgrade head` to apply schema
-    changes instead of relying on this.
+def init_db() -> None:
+    """Bring the schema up to date by running Alembic migrations.
+
+    A no-op when the database is already at head, so a fresh checkout works
+    without a manual `alembic upgrade head`, and an existing database picks
+    up new migrations on the next start.
     """
-    pass
+    alembic_cfg = Config(str(BACKEND_DIR / "alembic.ini"))
+    # Keep uvicorn's logging intact — see alembic/env.py.
+    alembic_cfg.attributes["configure_logger"] = False
+    command.upgrade(alembic_cfg, "head")
+
 
 def get_db():
     """FastAPI dependency that yields a DB session and closes it after the request."""

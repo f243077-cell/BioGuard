@@ -17,7 +17,9 @@ from app.models import alert, device, reading, user  # noqa: F401
 config = context.config
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
-if config.config_file_name is not None:
+# Skipped when init_db() runs migrations inside the running server, where
+# fileConfig would disable uvicorn's already-configured loggers.
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata

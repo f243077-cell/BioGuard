@@ -44,7 +44,7 @@ def list_devices(db: Session = Depends(get_db), current_user: User = Depends(get
 def device_history(
     device_id: str,
     reading_type: Optional[str] = Query(default=None, pattern="^(temperature|lock)$"),
-    limit: int = Query(default=100, le=1000),
+    limit: int = Query(default=100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

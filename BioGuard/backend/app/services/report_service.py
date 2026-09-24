@@ -5,6 +5,7 @@ Generates a PDF summary report for a device: recent readings and alerts.
 
 import io
 from datetime import datetime, timezone
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -41,7 +42,9 @@ def generate_device_report(
     styles = getSampleStyleSheet()
     elements = []
 
-    elements.append(Paragraph(f"BioGuard Report — {device_id}", styles["Title"]))
+    # Paragraph parses its text as markup: escape anything that came from a
+    # device or the database, or a stray "<" or "&" aborts the whole report.
+    elements.append(Paragraph(f"BioGuard Report — {escape(device_id)}", styles["Title"]))
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     elements.append(Paragraph(f"Generated {generated_at}", styles["Normal"]))
     elements.append(Spacer(1, 0.5 * cm))
@@ -56,7 +59,7 @@ def generate_device_report(
     elements.append(Spacer(1, 0.7 * cm))
 
     elements.append(Paragraph("Recent Readings", styles["Heading2"]))
-    reading_data = [["Type", "Value", "Anomalous", "Timestamp"]]
+    reading_data = [["Type", "Value", "Anomalous", "Timestamp (UTC)"]]
     for r in readings:
         value = r.numeric_value if r.numeric_value is not None else r.status_value
         reading_data.append(
@@ -77,13 +80,13 @@ def generate_device_report(
     cell_style.fontSize = 8
     cell_style.leading = 10
 
-    alert_data = [["Type", "Severity", "Message", "Resolved", "Created"]]
+    alert_data = [["Type", "Severity", "Message", "Resolved", "Created (UTC)"]]
     for a in alerts:
         alert_data.append(
             [
-                Paragraph(a.alert_type, cell_style),
+                Paragraph(escape(a.alert_type), cell_style),
                 a.severity,
-                Paragraph(a.message, cell_style),
+                Paragraph(escape(a.message), cell_style),
                 "Yes" if a.resolved else "No",
                 a.created_at.strftime("%Y-%m-%d %H:%M:%S") if a.created_at else "",
             ]
