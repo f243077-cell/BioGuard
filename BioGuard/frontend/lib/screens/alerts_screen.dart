@@ -1,14 +1,15 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/theme.dart';
 import '../models/alert.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_exceptions.dart';
 import '../services/websocket_service.dart';
 import '../utils/alarm_player.dart';
+import '../utils/time_format.dart';
 import '../widgets/alert_banner.dart';
+import '../widgets/glass.dart';
 
 /// BioGuard — Alerts Screen
 /// Loads alert history via REST on open, then live-updates over WebSocket.
@@ -107,138 +108,96 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF6A11CB), Color(0xFF2575FC), Color(0xFF00C9A7)],
-          ),
-        ),
-        child: Stack(
-          children: [
-            SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Alerts',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  if (!_connected)
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 8,
-                        horizontal: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.orangeAccent.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: Colors.orangeAccent.withValues(alpha: 0.5),
-                        ),
-                      ),
-                      child: const Row(
-                        children: [
-                          SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.orangeAccent,
-                            ),
-                          ),
-                          SizedBox(width: 10),
-                          Text(
-                            'Reconnecting to live alerts…',
-                            style: TextStyle(
-                              color: Colors.orangeAccent,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  Expanded(child: _buildList()),
-                ],
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          Positioned.fill(child: _buildList()),
+          if (_bannerAlert != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: AlertBanner(
+                key: ValueKey('${_bannerAlert!.id}-${_bannerAlert!.resolved}'),
+                alert: _bannerAlert!,
+                onDismiss: () => setState(() => _bannerAlert = null),
               ),
             ),
-            if (_bannerAlert != null)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: AlertBanner(
-                  key: ValueKey(
-                    '${_bannerAlert!.id}-${_bannerAlert!.resolved}',
-                  ),
-                  alert: _bannerAlert!,
-                  onDismiss: () => setState(() => _bannerAlert = null),
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildList() {
+    final insets = MediaQuery.paddingOf(context);
+
+    final Widget content;
     if (_loadingHistory && _alerts.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
+      content = const Padding(
+        padding: EdgeInsets.only(top: 80),
+        child: Center(child: CircularProgressIndicator()),
       );
-    }
-    if (_historyError != null && _alerts.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Failed to load alert history:\n$_historyError',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadHistory,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.2),
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
+    } else if (_historyError != null && _alerts.isEmpty) {
+      content = EmptyState(
+        icon: Icons.cloud_off_rounded,
+        color: AppColors.danger,
+        title: 'Failed to load alert history',
+        message: _historyError,
+        onRetry: _loadHistory,
       );
-    }
-    if (_alerts.isEmpty) {
-      return Center(
-        child: Text(
-          _connected ? 'No alerts yet.' : 'Waiting to reconnect…',
-          style: const TextStyle(color: Colors.white70),
-        ),
+    } else if (_alerts.isEmpty) {
+      content = EmptyState(
+        icon: Icons.notifications_none_rounded,
+        title: _connected ? 'No alerts yet' : 'Waiting to reconnect…',
+        message: _connected
+            ? 'You will be notified here the moment something goes wrong.'
+            : null,
       );
+    } else {
+      content = Column(children: _alerts.map(_buildAlertTile).toList());
     }
 
     return RefreshIndicator(
       onRefresh: _loadHistory,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _alerts.length,
-        itemBuilder: (context, index) => _buildAlertTile(_alerts[index]),
+      edgeOffset: insets.top,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          insets.top + 16,
+          16,
+          insets.bottom + 24,
+        ),
+        children: [_buildStatusHeader(), const SizedBox(height: 20), content],
+      ),
+    );
+  }
+
+  Widget _buildStatusHeader() {
+    final active = _alerts.where((a) => !a.resolved).length;
+    final resolved = _alerts.length - active;
+
+    return GlassPanel(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      borderRadius: 20,
+      tint: _connected ? null : AppColors.warning,
+      child: Row(
+        children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: LiveIndicator(active: _connected),
+            ),
+          ),
+          if (_alerts.isNotEmpty) ...[
+            _CountBadge(
+              label: '$active active',
+              color: active > 0 ? AppColors.danger : AppColors.textMuted,
+            ),
+            const SizedBox(width: 6),
+            _CountBadge(label: '$resolved resolved', color: AppColors.success),
+          ],
+        ],
       ),
     );
   }
@@ -246,65 +205,96 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
   Widget _buildAlertTile(Alert alert) {
     final isCritical = alert.severity == 'critical';
     final color = alert.resolved
-        ? Colors.greenAccent
-        : (isCritical ? Colors.redAccent : Colors.orangeAccent);
+        ? AppColors.success
+        : (isCritical ? AppColors.danger : AppColors.warning);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+      child: GlassPanel(
+        padding: const EdgeInsets.all(16),
+        borderRadius: 20,
+        tint: !alert.resolved && isCritical ? AppColors.danger : null,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            IconTile(
+              icon: alert.resolved
+                  ? Icons.check_circle_rounded
+                  : Icons.warning_amber_rounded,
+              color: color,
+              size: 40,
             ),
-            child: Row(
-              children: [
-                Icon(
-                  alert.resolved
-                      ? Icons.check_circle
-                      : Icons.warning_amber_rounded,
-                  color: color,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Text(
-                        alert.deviceId,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
+                      Expanded(
+                        child: Text(
+                          alert.deviceId,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       Text(
-                        alert.message,
+                        timeAgo(alert.createdAt),
                         style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                        ),
-                      ),
-                      Text(
-                        alert.resolved
-                            ? 'Resolved'
-                            : alert.severity.toUpperCase(),
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+                          color: AppColors.textMuted,
+                          fontSize: 12,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    alert.message,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13.5,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  StatusPill(
+                    label: alert.resolved ? 'Resolved' : alert.severity,
+                    color: color,
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

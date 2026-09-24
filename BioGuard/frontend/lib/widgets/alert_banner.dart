@@ -3,10 +3,12 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../config/theme.dart';
 import '../models/alert.dart';
+import 'glass.dart';
 
 /// BioGuard — Alert Banner
-/// Glassmorphic banner that pops in when a new alert arrives and
+/// Frosted glass banner that pops in when a new alert arrives and
 /// auto-dismisses after a few seconds.
 class AlertBanner extends StatefulWidget {
   final Alert alert;
@@ -38,29 +40,35 @@ class _AlertBannerState extends State<AlertBanner> {
   @override
   Widget build(BuildContext context) {
     final isCritical = widget.alert.severity == 'critical';
-    final color = isCritical ? Colors.redAccent : Colors.orangeAccent;
+    final color = isCritical ? AppColors.danger : AppColors.warning;
 
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: color.withValues(alpha: 0.6)),
+                // Mostly-opaque graphite so the banner stays legible over
+                // busy content, with a wash of the severity color on top.
+                color: Color.alphaBlend(
+                  color.withValues(alpha: 0.16),
+                  AppColors.graphite.withValues(alpha: 0.88),
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: color.withValues(alpha: 0.55)),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    isCritical
+                  IconTile(
+                    icon: isCritical
                         ? Icons.warning_amber_rounded
-                        : Icons.info_outline,
+                        : Icons.info_outline_rounded,
                     color: color,
+                    size: 40,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -70,14 +78,15 @@ class _AlertBannerState extends State<AlertBanner> {
                         Text(
                           widget.alert.deviceId,
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           widget.alert.message,
                           style: const TextStyle(
-                            color: Colors.white70,
+                            color: AppColors.textSecondary,
                             fontSize: 13,
                           ),
                         ),
@@ -86,10 +95,11 @@ class _AlertBannerState extends State<AlertBanner> {
                   ),
                   IconButton(
                     icon: const Icon(
-                      Icons.close,
-                      color: Colors.white70,
+                      Icons.close_rounded,
+                      color: AppColors.textSecondary,
                       size: 18,
                     ),
+                    tooltip: 'Dismiss',
                     onPressed: widget.onDismiss,
                   ),
                 ],

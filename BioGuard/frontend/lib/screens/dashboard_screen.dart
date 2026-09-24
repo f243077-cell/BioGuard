@@ -1,16 +1,18 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/theme.dart';
 import '../models/device.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_exceptions.dart';
+import '../utils/time_format.dart';
+import '../widgets/glass.dart';
 
 /// BioGuard — Dashboard Screen
-/// Polls the backend every few seconds and shows each device's live status
-/// as a glassmorphic card over a colorful gradient background.
+/// Polls the backend every few seconds and shows a fleet summary plus each
+/// device's live status as a frosted glass card.
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
@@ -67,157 +69,279 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF6A11CB), Color(0xFF2575FC), Color(0xFF00C9A7)],
-          ),
-        ),
-        child: SafeArea(child: _buildBody()),
-      ),
-    );
+    return Scaffold(backgroundColor: Colors.transparent, body: _buildBody());
   }
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
       return Center(
-        child: Text(
-          'Failed to load devices:\n$_error',
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white),
+        child: EmptyState(
+          icon: Icons.cloud_off_rounded,
+          color: AppColors.danger,
+          title: 'Failed to load devices',
+          message: _error,
         ),
       );
     }
     if (_devices.isEmpty) {
       return const Center(
-        child: Text(
-          'No devices reporting yet.',
-          style: TextStyle(color: Colors.white),
+        child: EmptyState(
+          icon: Icons.sensors_off_rounded,
+          title: 'No devices reporting yet',
+          message: 'Devices appear here as soon as they send a reading.',
         ),
       );
     }
 
+    final insets = MediaQuery.paddingOf(context);
+
     return RefreshIndicator(
       onRefresh: _loadDevices,
+      edgeOffset: insets.top,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          insets.top + 16,
+          16,
+          insets.bottom + 24,
+        ),
         children: [
-          const Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: Text(
-              'BioGuard',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+          _buildSummary(),
+          const SizedBox(height: 28),
+          const SectionHeader(title: 'Devices', trailing: LiveIndicator()),
           ..._devices.map(_buildDeviceCard),
         ],
       ),
     );
   }
 
-  Widget _buildDeviceCard(Device device) {
-    final temp = device.temperature?.numericValue;
-    final anomalous = device.hasAnomaly;
-    final locked = device.isLocked;
+  Widget _buildSummary() {
+    final anomalies = _devices.where((d) => d.hasAnomaly).length;
+    final unlocked = _devices
+        .where((d) => d.lock != null && !d.isLocked)
+        .length;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      device.deviceId,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (anomalous) _buildBadge('ANOMALY', Colors.redAccent),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    _buildStat(
-                      icon: Icons.thermostat,
-                      label: temp != null
-                          ? '${temp.toStringAsFixed(1)}°C'
-                          : '--',
-                      color: anomalous
-                          ? Colors.orangeAccent
-                          : Colors.cyanAccent,
-                    ),
-                    const SizedBox(width: 24),
-                    _buildStat(
-                      icon: locked ? Icons.lock : Icons.lock_open,
-                      label: locked ? 'Locked' : 'Unlocked',
-                      color: locked ? Colors.greenAccent : Colors.redAccent,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStat({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
     return Row(
       children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(width: 6),
-        Text(label, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        Expanded(
+          child: _StatTile(
+            icon: Icons.sensors_rounded,
+            value: _devices.length,
+            label: 'Devices',
+            color: AppColors.skyMint,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _StatTile(
+            icon: Icons.warning_amber_rounded,
+            value: anomalies,
+            label: 'Anomalies',
+            color: anomalies > 0 ? AppColors.danger : AppColors.skyMint,
+            highlight: anomalies > 0,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _StatTile(
+            icon: Icons.lock_open_rounded,
+            value: unlocked,
+            label: 'Unlocked',
+            color: unlocked > 0 ? AppColors.warning : AppColors.skyMint,
+            highlight: unlocked > 0,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildBadge(String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
+  Widget _buildDeviceCard(Device device) {
+    final temp = device.temperature?.numericValue;
+    final anomalous = device.hasAnomaly;
+    final lastUpdate = device.temperature?.timestamp ?? device.lock?.timestamp;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: GlassPanel(
+        tint: anomalous ? AppColors.danger : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                IconTile(
+                  icon: Icons.ac_unit_rounded,
+                  color: anomalous ? AppColors.danger : AppColors.skyMint,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        device.deviceId,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        lastUpdate != null
+                            ? 'Updated ${timeAgo(lastUpdate)}'
+                            : 'No readings yet',
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                anomalous
+                    ? const StatusPill(
+                        label: 'Anomaly',
+                        color: AppColors.danger,
+                        icon: Icons.error_outline_rounded,
+                      )
+                    : const StatusPill(
+                        label: 'Normal',
+                        color: AppColors.success,
+                        icon: Icons.check_circle_outline_rounded,
+                      ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  temp != null ? temp.toStringAsFixed(1) : '--',
+                  style: TextStyle(
+                    color: anomalous ? AppColors.danger : AppColors.textPrimary,
+                    fontSize: 44,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                    letterSpacing: -1,
+                  ),
+                ),
+                if (temp != null)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4, bottom: 4),
+                    child: Text(
+                      '°C',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                const Spacer(),
+                _LockChip(device: device),
+              ],
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+    this.highlight = false,
+  });
+
+  final IconData icon;
+  final int value;
+  final String label;
+  final Color color;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      padding: const EdgeInsets.all(14),
+      borderRadius: 20,
+      tint: highlight ? color : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 12),
+          Text(
+            '$value',
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LockChip extends StatelessWidget {
+  const _LockChip({required this.device});
+
+  final Device device;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasLock = device.lock != null;
+    final locked = device.isLocked;
+    final color = !hasLock
+        ? AppColors.textMuted
+        : (locked ? AppColors.success : AppColors.warning);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.glassFill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.glassBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            locked ? Icons.lock_rounded : Icons.lock_open_rounded,
+            color: color,
+            size: 18,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            !hasLock ? 'No lock data' : (locked ? 'Locked' : 'Unlocked'),
+            style: TextStyle(
+              color: hasLock ? AppColors.textPrimary : AppColors.textMuted,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

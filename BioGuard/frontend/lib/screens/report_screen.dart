@@ -1,14 +1,13 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/theme.dart';
 import '../models/device.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-// add import
 import '../services/api_exceptions.dart';
+import '../widgets/glass.dart';
 
 /// BioGuard — Report Screen
 /// Lists devices and opens a PDF summary report for the selected one.
@@ -83,132 +82,156 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF6A11CB), Color(0xFF2575FC), Color(0xFF00C9A7)],
-          ),
-        ),
-        child: SafeArea(child: _buildBody()),
-      ),
-    );
+    return Scaffold(backgroundColor: Colors.transparent, body: _buildBody());
   }
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Failed to load devices:\n$_error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadDevices,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.2),
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    if (_devices.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _loadDevices,
-        color: Colors.cyanAccent,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 120),
-            Center(
-              child: Text(
-                'No devices reporting yet.',
-                style: TextStyle(color: Colors.white70),
-              ),
-            ),
-          ],
+        child: EmptyState(
+          icon: Icons.cloud_off_rounded,
+          color: AppColors.danger,
+          title: 'Failed to load devices',
+          message: _error,
+          onRetry: _loadDevices,
         ),
       );
     }
 
+    final insets = MediaQuery.paddingOf(context);
+
     return RefreshIndicator(
       onRefresh: _loadDevices,
-      color: Colors.cyanAccent,
+      edgeOffset: insets.top,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          insets.top + 16,
+          16,
+          insets.bottom + 24,
+        ),
         children: [
-          const Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: Text(
-              'Reports',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
+          const GlassPanel(
+            child: Row(
+              children: [
+                IconTile(icon: Icons.description_rounded, size: 48),
+                SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Device reports',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Open a PDF summary of readings and alerts '
+                        'for any device.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          ..._devices.map(_buildDeviceTile),
+          const SizedBox(height: 28),
+          if (_devices.isEmpty)
+            const EmptyState(
+              icon: Icons.sensors_off_rounded,
+              title: 'No devices reporting yet',
+              message: 'Pull down to refresh.',
+            )
+          else ...[
+            SectionHeader(
+              title: 'Devices',
+              trailing: Text(
+                '${_devices.length}',
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
+            ),
+            ..._devices.map(_buildDeviceTile),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildDeviceTile(Device device) {
+    final temp = device.temperature?.numericValue;
+    final details = [
+      if (temp != null) '${temp.toStringAsFixed(1)}°C',
+      if (device.lock != null) device.isLocked ? 'Locked' : 'Unlocked',
+    ].join('  ·  ');
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+      child: GlassPanel(
+        padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+        borderRadius: 20,
+        child: Row(
+          children: [
+            IconTile(
+              icon: Icons.ac_unit_rounded,
+              color: device.hasAnomaly ? AppColors.danger : AppColors.skyMint,
+              size: 40,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  device.deviceId,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    device.deviceId,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () => _openReport(device.deviceId),
-                  icon: const Icon(Icons.picture_as_pdf, size: 18),
-                  label: const Text('View report'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.2),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                  ),
-                ),
-              ],
+                  if (details.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      details,
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: () => _openReport(device.deviceId),
+              icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+              label: const Text('View'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                minimumSize: const Size(0, 40),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
