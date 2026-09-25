@@ -24,5 +24,10 @@ class ReadingOut(BaseModel):
 
 class DeviceStatus(BaseModel):
     device_id: str
+    # Set only once a Device row exists for this id (e.g. via
+    # scripts/seed_devices.py) — null for an auto-registered device that
+    # has never been named.
+    name: Optional[str] = None
+    location: Optional[str] = None
     temperature: Optional[ReadingOut] = None
     lock: Optional[ReadingOut] = None

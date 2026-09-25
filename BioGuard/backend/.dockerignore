@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+*.db
+*.db-shm
+*.db-wal
+.env
+.venv/
+venv/
+firebase-credentials.json
+check_db.py
+check_alerts.py
+update_threshold.py
+reset_threshold.py

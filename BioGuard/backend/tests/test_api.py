@@ -39,6 +39,21 @@ def test_api_timestamps_carry_utc_offset(client, auth_headers):
     assert alert["created_at"].endswith(("Z", "+00:00"))
 
 
+def test_devices_include_name_and_location_when_seeded(client, auth_headers, db):
+    from app.models.device import Device
+
+    handle_temperature_message("bioguard/fridge-1/temperature", b'{"value": 5.0}')
+    handle_temperature_message("bioguard/fridge-2/temperature", b'{"value": 5.0}')
+    db.query(Device).filter_by(device_id="fridge-1").update(
+        {"name": "Vaccine Fridge", "location": "Ward A"}
+    )
+    db.commit()
+
+    devices = {d["device_id"]: d for d in client.get("/devices", headers=auth_headers).json()}
+    assert (devices["fridge-1"]["name"], devices["fridge-1"]["location"]) == ("Vaccine Fridge", "Ward A")
+    assert (devices["fridge-2"]["name"], devices["fridge-2"]["location"]) == (None, None)
+
+
 @pytest.mark.parametrize("path", ["/alerts?limit=0", "/alerts?limit=-1", "/devices/fridge-1/history?limit=-1"])
 def test_non_positive_limits_are_rejected(client, auth_headers, path):
     assert client.get(path, headers=auth_headers).status_code == 422

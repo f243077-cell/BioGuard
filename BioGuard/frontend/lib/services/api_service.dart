@@ -2,22 +2,19 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../config/constants.dart';
 import '../models/device.dart';
 import '../models/reading.dart';
 import 'token_storage.dart';
 import 'api_exceptions.dart';
-// add to imports
 import '../models/alert.dart';
 
 /// BioGuard — API Service
-/// REST calls to the backend's device endpoints.
-///
-/// NOTE: base URL is inlined here for now — this moves into
-/// config/constants.dart once WebSocket + FCM configs join it in later phases.
-/// Android emulator -> host machine is 10.0.2.2, NOT localhost.
-/// Physical device / iOS simulator: replace with your machine's LAN IP.
+/// REST calls to the backend's device endpoints. See AppConfig.apiBaseUrl
+/// for how to point this at a real backend instead of the Android
+/// emulator's loopback address.
 class ApiService {
-  static const String apiBaseUrl = 'http://10.0.2.2:8000';
+  static const String apiBaseUrl = AppConfig.apiBaseUrl;
 
   ApiService({required TokenStorage tokenStorage})
     : _tokenStorage = tokenStorage;

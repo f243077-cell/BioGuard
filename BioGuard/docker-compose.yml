@@ -1,0 +1,91 @@
+# BioGuard — full local stack: MQTT broker, backend API, and three
+# simulated devices (matching the device-001/002/003 demo data used
+# elsewhere in the project).
+#
+# Quick start:
+#   docker compose up --build
+#
+# Then:
+#   Backend API:  http://localhost:8000        (interactive docs at /docs)
+#   MQTT broker:  localhost:1883
+#
+# Copy .env.example to .env to override any of the defaults below — in
+# particular, set a real JWT_SECRET_KEY before this leaves your machine.
+# Both the backend and every simulator already retry their connections, so
+# `docker compose up` works regardless of which service becomes ready
+# first; depends_on below only controls container start order, not app
+# readiness.
+
+services:
+  broker:
+    image: eclipse-mosquitto:2
+    container_name: bioguard-broker
+    restart: unless-stopped
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+    volumes:
+      - ./broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+
+  backend:
+    build: ./backend
+    container_name: bioguard-backend
+    restart: unless-stopped
+    depends_on:
+      - broker
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      MQTT_BROKER_HOST: broker
+      # Lives in the backend-data volume below (not in the image), so it
+      # survives `docker compose down` and image rebuilds.
+      DATABASE_URL: sqlite:////data/bioguard.db
+      # Keep this default in sync with DEV_JWT_SECRET_KEY in
+      # backend/app/config.py — the backend logs a startup warning
+      # whenever it's still set to this value.
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-change-me-before-deploying-anywhere-real}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-1440}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-}
+    volumes:
+      - backend-data:/data
+      # To enable push notifications, mount a real service-account file and
+      # point FIREBASE_CREDENTIALS_PATH (above) at it:
+      # - ./backend/firebase-credentials.json:/run/secrets/firebase.json:ro
+
+  # Add more devices by copying one of these blocks with a new
+  # container_name/DEVICE_ID pair.
+  simulator-1:
+    build: ./simulator
+    container_name: bioguard-simulator-1
+    restart: unless-stopped
+    depends_on:
+      - broker
+    environment:
+      MQTT_BROKER_HOST: broker
+      DEVICE_ID: device-001
+
+  simulator-2:
+    build: ./simulator
+    container_name: bioguard-simulator-2
+    restart: unless-stopped
+    depends_on:
+      - broker
+    environment:
+      MQTT_BROKER_HOST: broker
+      DEVICE_ID: device-002
+
+  simulator-3:
+    build: ./simulator
+    container_name: bioguard-simulator-3
+    restart: unless-stopped
+    depends_on:
+      - broker
+    environment:
+      MQTT_BROKER_HOST: broker
+      DEVICE_ID: device-003
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:
+  backend-data:

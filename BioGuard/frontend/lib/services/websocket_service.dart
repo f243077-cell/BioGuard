@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../config/constants.dart';
 import '../models/alert.dart';
 import 'token_storage.dart';
 
@@ -13,7 +14,7 @@ import 'token_storage.dart';
 /// onUnauthorized instead of retrying, since retrying against a token that
 /// will never become valid is pointless.
 class WebSocketService {
-  static const String _wsBaseUrl = 'ws://10.0.2.2:8000/ws/alerts';
+  static final String _wsBaseUrl = AppConfig.wsAlertsUrl;
   static const int _unauthorizedCloseCode = 4401;
   static const List<Duration> _backoffSchedule = [
     Duration(seconds: 2),

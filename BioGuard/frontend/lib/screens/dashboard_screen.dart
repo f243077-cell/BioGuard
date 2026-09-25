@@ -183,7 +183,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        device.deviceId,
+                        device.displayName,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
@@ -193,9 +193,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        lastUpdate != null
-                            ? 'Updated ${timeAgo(lastUpdate)}'
-                            : 'No readings yet',
+                        _subtitleFor(device, lastUpdate),
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 12,
@@ -252,6 +251,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
       ),
     );
+  }
+
+  /// "Ward A, Level 2 · Updated 12s ago" when a location is set, else just
+  /// "device-001 · Updated 12s ago" (the id, since the title above already
+  /// shows the friendly name and the id would otherwise appear nowhere).
+  String _subtitleFor(Device device, DateTime? lastUpdate) {
+    final updated = lastUpdate != null
+        ? 'Updated ${timeAgo(lastUpdate)}'
+        : 'No readings yet';
+    final lead = device.location?.isNotEmpty == true
+        ? device.location!
+        : (device.name?.isNotEmpty == true ? device.deviceId : null);
+    return lead != null ? '$lead · $updated' : updated;
   }
 }
 

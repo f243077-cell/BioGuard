@@ -6,6 +6,7 @@ import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/history_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/report_screen.dart';
 import 'services/fcm_service.dart';
@@ -50,8 +51,8 @@ class BioGuardApp extends ConsumerWidget {
   }
 }
 
-/// Bottom-nav shell switching between the live Dashboard, Alerts and
-/// Reports screens. The glass app bar and nav bar float over a shared
+/// Bottom-nav shell switching between the live Dashboard, Alerts, History
+/// and Reports screens. The glass app bar and nav bar float over a shared
 /// background; each page scrolls beneath them.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -62,7 +63,7 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
-  static const _titles = ['Dashboard', 'Alerts', 'Reports'];
+  static const _titles = ['Dashboard', 'Alerts', 'History', 'Reports'];
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +77,8 @@ class _MainShellState extends State<MainShell> {
           children: [
             const DashboardScreen(),
             const AlertsScreen(),
-            ReportScreen(isActive: _index == 2),
+            const HistoryScreen(),
+            ReportScreen(isActive: _index == 3),
           ],
         ),
       ),
@@ -86,6 +88,7 @@ class _MainShellState extends State<MainShell> {
         items: const [
           GlassNavItem(icon: Icons.space_dashboard_rounded, label: 'Dashboard'),
           GlassNavItem(icon: Icons.notifications_rounded, label: 'Alerts'),
+          GlassNavItem(icon: Icons.show_chart_rounded, label: 'History'),
           GlassNavItem(icon: Icons.picture_as_pdf_rounded, label: 'Reports'),
         ],
       ),
